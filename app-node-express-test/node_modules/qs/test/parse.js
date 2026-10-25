@@ -1475,6 +1475,73 @@ test('parse()', function (t) {
             sst.end();
         });
 
+        st.test('spreads a comma group appended to an already-overflowed object', function (sst) {
+            var result = qs.parse('a=1,2,3,4,5,6&a=7,8', { comma: true, arrayLimit: 5 });
+            sst.deepEqual(
+                result,
+                { a: { 0: '1', 1: '2', 2: '3', 3: '4', 4: '5', 5: '6', 6: '7', 7: '8' } },
+                'appended comma values are flattened, not nested'
+            );
+            sst.end();
+        });
+
+        st.test('keeps a `[]=` comma group as one element when appended to an already-overflowed key', function (sst) {
+            var result = qs.parse('a[]=1&a[]=2&a[]=3&a[]=4,5', { comma: true, arrayLimit: 2 });
+            sst.deepEqual(
+                result,
+                { a: { 0: '1', 1: '2', 2: '3', 3: ['4', '5'] } },
+                'nested comma group stays a single element, not double-nested'
+            );
+            sst.end();
+        });
+
+        st.test('spreads every later comma group appended to an already-overflowed object', function (sst) {
+            var result = qs.parse('a=1,2,3,4,5,6&a=7,8&a=9,10', { comma: true, arrayLimit: 5 });
+            sst.deepEqual(
+                result,
+                { a: { 0: '1', 1: '2', 2: '3', 3: '4', 4: '5', 5: '6', 6: '7', 7: '8', 8: '9', 9: '10' } },
+                'each appended group is flattened in order'
+            );
+            sst.end();
+        });
+
+        st.test('spreads a comma group appended to an object overflowed under the default arrayLimit', function (sst) {
+            var values = [];
+            for (var i = 0; i <= 20; i += 1) {
+                values[values.length] = String(i);
+            }
+            var expected = {};
+            for (var j = 0; j < values.length; j += 1) {
+                expected[j] = values[j];
+            }
+            expected[21] = 'x';
+            expected[22] = 'y';
+
+            var result = qs.parse('a=' + values.join(',') + '&a=x,y', { comma: true });
+            sst.deepEqual(result, { a: expected }, 'appended values land at indices 21 and 22');
+            sst.end();
+        });
+
+        st.test('spreads a comma group appended to an already-overflowed object with plainObjects', function (sst) {
+            var result = qs.parse('a=1,2,3,4,5,6&a=7,8', { comma: true, arrayLimit: 5, plainObjects: true });
+            sst.deepEqual(
+                result,
+                { __proto__: null, a: { __proto__: null, 0: '1', 1: '2', 2: '3', 3: '4', 4: '5', 5: '6', 6: '7', 7: '8' } },
+                'appended comma values are flattened into the null object'
+            );
+            sst.end();
+        });
+
+        st.test('still throws with throwOnLimitExceeded when a comma group is appended to an already-overflowed object', function (sst) {
+            sst['throws'](
+                function () {
+                    qs.parse('a=1,2,3,4,5,6&a=7,8', { comma: true, arrayLimit: 5, throwOnLimitExceeded: true });
+                },
+                /Array limit exceeded/,
+                'throws before spreading the appended group'
+            );
+            sst.end();
+        });
         st.test('does not throw for comma groups nested under bracket notation, counting each group as one element', function (sst) {
             var result = qs.parse('a[]=1,2,3&a[]=4,5,6', { comma: true, arrayLimit: 5, throwOnLimitExceeded: true });
             sst.deepEqual(result, { a: [['1', '2', '3'], ['4', '5', '6']] }, 'nested comma groups count as one element each');
