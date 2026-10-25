@@ -4,16 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test proxy-addr.test.js"
+    "test": "node --test proxy-addr.test.js security/dependency-parsing.test.cjs security/qs-security.test.cjs"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "4.22.2",
+    "express": "4.22.3",
     "helloworld": "^0.0.0",
     "mkdirp": "^3.0.1",
     "mongodb": "^6.3.0",
-    "morgan": "^1.10.0",
+    "morgan": "1.12.1",
     "postgresql": "^0.0.1"
   },
   "devDependencies": {
