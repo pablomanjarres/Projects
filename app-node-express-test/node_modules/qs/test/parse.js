@@ -1522,9 +1522,131 @@ test('parse()', function (t) {
             sst.end();
         });
 
-        st.test('does not throw for a bracketed comma group within arrayLimit', function (sst) {
-            var result = qs.parse('a[]=1,2,3,4,5,6', { comma: true, arrayLimit: 5, throwOnLimitExceeded: true });
-            sst.deepEqual(result, { a: [['1', '2', '3', '4', '5', '6']] }, 'a bracketed comma group is a single element');
+        st.test('throws before splitting when a bracketed comma group exceeds arrayLimit', function (sst) {
+            sst['throws'](
+                function () {
+                    qs.parse('a[]=1,2,3,4,5,6', { comma: true, arrayLimit: 5, throwOnLimitExceeded: true });
+                },
+                new RangeError('Array limit exceeded. Only 5 elements allowed in an array.'),
+                'the inner group is itself an array and is subject to arrayLimit'
+            );
+            sst.end();
+        });
+
+        st.test('throws before splitting when a comma group under `[]=` exceeds arrayLimit', function (sst) {
+            sst['throws'](
+                function () {
+                    qs.parse('a[]=1,2,3,4', { comma: true, arrayLimit: 3, throwOnLimitExceeded: true });
+                },
+                new RangeError('Array limit exceeded. Only 3 elements allowed in an array.'),
+                'a bracket-push comma group over the limit throws like the flat form'
+            );
+
+            sst['throws'](
+                function () {
+                    qs.parse('a[]=1,2', { comma: true, arrayLimit: 1, throwOnLimitExceeded: true });
+                },
+                new RangeError('Array limit exceeded. Only 1 element allowed in an array.'),
+                'singular message at arrayLimit 1'
+            );
+
+            sst['throws'](
+                function () {
+                    qs.parse('a[b][]=1,2,3,4', { comma: true, arrayLimit: 3, throwOnLimitExceeded: true });
+                },
+                new RangeError('Array limit exceeded. Only 3 elements allowed in an array.'),
+                'a nested bracket-push key throws'
+            );
+
+            sst['throws'](
+                function () {
+                    qs.parse('a[][]=1,2,3,4', { comma: true, arrayLimit: 3, throwOnLimitExceeded: true });
+                },
+                new RangeError('Array limit exceeded. Only 3 elements allowed in an array.'),
+                'a doubly bracket-pushed key throws'
+            );
+
+            sst['throws'](
+                function () {
+                    qs.parse('a[]=5&a[]=1,2,3,4', { comma: true, arrayLimit: 3, throwOnLimitExceeded: true });
+                },
+                new RangeError('Array limit exceeded. Only 3 elements allowed in an array.'),
+                'an oversized group appended after a scalar throws'
+            );
+
+            sst['throws'](
+                function () {
+                    qs.parse('a[]=1,2,3,4&a[]=5', { comma: true, arrayLimit: 3, throwOnLimitExceeded: true });
+                },
+                new RangeError('Array limit exceeded. Only 3 elements allowed in an array.'),
+                'an oversized group throws even when a later part would fit'
+            );
+
+            sst['throws'](
+                function () {
+                    qs.parse('a[]=1,2,3,4&a[]=5', { comma: true, arrayLimit: 3, throwOnLimitExceeded: true, duplicates: 'first' });
+                },
+                new RangeError('Array limit exceeded. Only 3 elements allowed in an array.'),
+                'throws with duplicates: first'
+            );
+
+            sst['throws'](
+                function () {
+                    qs.parse('a[]=5&a[]=1,2,3,4', { comma: true, arrayLimit: 3, throwOnLimitExceeded: true, duplicates: 'last' });
+                },
+                new RangeError('Array limit exceeded. Only 3 elements allowed in an array.'),
+                'throws with duplicates: last'
+            );
+
+            sst['throws'](
+                function () {
+                    qs.parse({ a: '1,2,3,4' }, { comma: true, arrayLimit: 3, throwOnLimitExceeded: true });
+                },
+                new RangeError('Array limit exceeded. Only 3 elements allowed in an array.'),
+                'an oversized comma value in object input throws'
+            );
+
+            var big = 'a[]=' + new Array(1e5 + 1).join('1,') + '1';
+            sst['throws'](
+                function () {
+                    qs.parse(big, { comma: true, arrayLimit: 3, throwOnLimitExceeded: true });
+                },
+                new RangeError('Array limit exceeded. Only 3 elements allowed in an array.'),
+                'a very long bracket-push comma group throws'
+            );
+            sst.end();
+        });
+
+        st.test('does not throw for a comma group under `[]=` within arrayLimit', function (sst) {
+            sst.deepEqual(
+                qs.parse('a[]=1,2,3', { comma: true, arrayLimit: 3, throwOnLimitExceeded: true }),
+                { a: [['1', '2', '3']] },
+                'an inner group exactly at the limit stays a single nested element'
+            );
+            sst.deepEqual(
+                qs.parse('a[]=1,2,3&a[]=4,5,6&a[]=7', { comma: true, arrayLimit: 3, throwOnLimitExceeded: true }),
+                { a: [['1', '2', '3'], ['4', '5', '6'], '7'] },
+                'each group counts as one element of the outer array'
+            );
+            sst.deepEqual(
+                qs.parse('a[b][]=1,2,3', { comma: true, arrayLimit: 3, throwOnLimitExceeded: true }),
+                { a: { b: [['1', '2', '3']] } },
+                'nested bracket-push key within the limit'
+            );
+            sst.deepEqual(
+                qs.parse({ a: '1,2,3' }, { comma: true, arrayLimit: 3, throwOnLimitExceeded: true }),
+                { a: ['1', '2', '3'] },
+                'object input within the limit'
+            );
+            sst.end();
+        });
+
+        st.test('keeps an oversized comma group under `[]=` as a nested array without throwOnLimitExceeded', function (sst) {
+            sst.deepEqual(
+                qs.parse('a[]=1,2,3,4', { comma: true, arrayLimit: 3 }),
+                { a: [['1', '2', '3', '4']] },
+                'the inner group is not converted to an overflow object'
+            );
             sst.end();
         });
 
